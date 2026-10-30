@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d12">
+  <meta name="description" content="Bảng điều khiển quản lý lịch học, chi tiêu, ghi chú và sức khỏe cá nhân.">
+  <title>MySpace — Personal Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            night: "#0b0d12", surface: "#11141c", card: "#151923",
+            line: "#252a36", muted: "#8b91a1", lime: "#c5f467",
+            lilac: "#b8a4ff", coral: "#ff9178", aqua: "#72d9d0"
+          },
+          fontFamily: { sans: ["Manrope", "ui-sans-serif", "system-ui"] }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    :root { color-scheme: dark; }
+    * { scrollbar-color: #343a48 #11141c; scrollbar-width: thin; }
+    body { font-family: Manrope, sans-serif; }
+    .mono { font-family: "DM Mono", monospace; }
+    .view { display: none; animation: appear .28s ease both; }
+    .view.active { display: block; }
+    .nav-item { transition: color .2s, background .2s, transform .2s; }
+    .nav-item:hover { transform: translateX(2px); color: #fff; background: #1b202b; }
+    .nav-item.active { color: #c5f467; background: rgba(197,244,103,.09); }
+    .panel { border: 1px solid #252a36; background: #11141c; border-radius: 20px; }
+    .panel, .lesson-open { position: relative; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(255,255,255,.025), 0 12px 32px rgba(0,0,0,.12); }
+    .panel::after { position: absolute; inset: 0; border-radius: inherit; content: ""; pointer-events: none; background: linear-gradient(135deg, rgba(255,255,255,.09), transparent 22%, transparent 72%, rgba(147,196,255,.04)); }
+    .input { width: 100%; border: 1px solid #303644; border-radius: 12px; background: #0c0f16; padding: 11px 13px; color: #f3f4f6; outline: none; }
+    .input:focus { border-color: #c5f467; box-shadow: 0 0 0 3px rgba(197,244,103,.1); }
+    .input::placeholder { color: #687080; }
+    select.input option { background: #11141c; }
+    .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; background: #c5f467; padding: 11px 16px; color: #11150b; font-size: 13px; font-weight: 800; transition: transform .2s, filter .2s; }
+    .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    .btn-quiet { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #303644; border-radius: 11px; background: #151923; padding: 9px 13px; color: #c6cad4; font-size: 12px; font-weight: 700; transition: border-color .2s, color .2s; }
+    .btn-quiet:hover { border-color: #687080; color: #fff; }
+    .table-cell { min-width: 105px; height: 92px; border-right: 1px solid #252a36; border-bottom: 1px solid #252a36; padding: 7px; vertical-align: top; }
+    .table-cell:last-child { border-right: 0; }
+    .slot { height: 100%; width: 100%; border: 1px dashed #303644; border-radius: 11px; color: #687080; transition: background .2s, border-color .2s; }
+    .slot:hover { border-color: #c5f467; background: rgba(197,244,103,.05); color: #c5f467; }
+    .sticky-note { min-height: 150px; }
+    .toast { animation: appear .2s ease both; }
+    dialog { border: 1px solid #303644; border-radius: 20px; background: #11141c; color: #f3f4f6; padding: 0; max-height: min(90vh, 900px); }
+    dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(5px); }
+    .soft-grid { background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 34px 34px; }
+    #lock-screen { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; overflow: hidden; padding: 24px; background: #160016; pointer-events: none; opacity: 1; visibility: visible; transform: scale(1); transition: opacity .5s ease, transform .5s ease, visibility .5s ease; }
+    #sylva-bg-frame { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; border: 0; pointer-events: auto; }
+    #lock-screen.unlocked { opacity: 0; visibility: hidden; transform: scale(.96); pointer-events: none; }
+    #lock-screen.unlocked .lock-glass { pointer-events: none; }
+    .lock-glass { --shine-x: 50%; --shine-y: 10%; position: relative; z-index: 1; width: min(100%, 410px); overflow: hidden; border: 1px solid rgba(220,237,255,.14); border-radius: 38px; background: rgba(255,255,255,.008); pointer-events: auto; box-shadow: inset 1px 2px 1px rgba(255,255,255,.42), inset 4px 7px 18px rgba(255,255,255,.035), inset -2px -3px 4px rgba(126,185,255,.16), inset -8px -12px 30px rgba(0,0,0,.42), 0 35px 100px rgba(0,0,0,.62); backdrop-filter: url(#glass-refraction) blur(12px) brightness(1.08) contrast(1.15); -webkit-backdrop-filter: blur(12px) brightness(1.08) contrast(1.15); transition: transform .75s cubic-bezier(.2,.8,.2,1), opacity .75s ease, box-shadow .25s ease; }
+    .lock-glass::before { position: absolute; inset: 0; border-radius: inherit; content: ""; pointer-events: none; background: radial-gradient(230px circle at var(--shine-x) var(--shine-y), rgba(255,255,255,.13), transparent 72%), linear-gradient(145deg, rgba(255,255,255,.14), transparent 25%, transparent 73%, rgba(128,187,255,.045)); }
+    .lock-glass::after { position: absolute; inset: 1px; border: 1px solid rgba(255,255,255,.035); border-radius: inherit; content: ""; pointer-events: none; box-shadow: inset 0 0 22px rgba(155,205,255,.025); }
+    .lock-glass.melting { transform: scale(1.16) translateY(-12px); opacity: 0; filter: blur(18px); }
+    .lock-input { width: 100%; border: 1px solid rgba(221,235,255,.18); border-radius: 22px; background: rgba(255,255,255,.008); padding: 15px 16px; color: white; text-align: center; letter-spacing: .3em; outline: none; box-shadow: inset 1px 2px 1px rgba(255,255,255,.3), inset 3px 5px 12px rgba(255,255,255,.035), inset -2px -3px 7px rgba(125,181,255,.11), inset -5px -7px 14px rgba(0,0,0,.36), 0 8px 22px rgba(0,0,0,.15); backdrop-filter: blur(12px) brightness(1.08) contrast(1.15); transition: border-color .2s, box-shadow .2s, transform .2s; }
+    .lock-input:focus { border-color: rgba(209,228,255,.48); box-shadow: inset 1px 2px 2px rgba(255,255,255,.32), inset -2px -3px 8px rgba(125,181,255,.12), 0 0 20px rgba(139,178,255,.12); }
+    .lock-input.invalid { border-color: #ef4444; box-shadow: inset 0 0 12px rgba(239,68,68,.22), 0 0 20px rgba(239,68,68,.58); animation: lock-input-shake .4s ease; }
+    @keyframes lock-input-shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
+    .lock-button { border: 1px solid rgba(255,255,255,.35); border-radius: 15px; background: linear-gradient(120deg, rgba(243,248,255,.94), rgba(187,211,255,.83)); color: #141a29; box-shadow: inset 0 1px 0 white, 0 8px 22px rgba(133,167,255,.2); transition: transform .2s, filter .2s; }
+    .lock-button:hover { transform: translateY(-2px); filter: brightness(1.08); }
+    @media (prefers-reduced-motion: reduce) { #lock-screen { transition-duration: .01ms; } .lock-input.invalid { animation-duration: .01ms; } }
+    @keyframes appear { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 767px) {
+      #sidebar { transform: translateX(-100%); transition: transform .25s ease; }
+      #sidebar.mobile-open { transform: translateX(0); }
+      .table-cell { min-width: 86px; height: 82px; padding: 4px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body class="min-h-screen bg-night text-slate-100 antialiased">
+  <svg aria-hidden="true" class="pointer-events-none fixed h-0 w-0">
+    <filter id="glass-refraction" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".012 .018" numOctaves="1" seed="8" result="glass-noise"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="glass-noise" scale="7" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>
+    </filter>
+  </svg>
+  <section id="lock-screen" aria-label="Màn hình khóa bảo mật">
+    <iframe id="sylva-bg-frame" src="sylva-living-green.html" title="Sylva Living Green 3D scene"></iframe>
+    <form id="unlock-form" class="lock-glass z-[1] p-7 text-center sm:p-10" autocomplete="off">
+      <div class="relative z-[1]">
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/25 bg-white/10 text-2xl text-white shadow-[inset_0_1px_2px_rgba(255,255,255,.3),0_12px_30px_rgba(0,0,0,.2)]"><i class="fa-solid fa-lock"></i></div>
+        <p class="mono mt-6 text-[9px] uppercase tracking-[.28em] text-blue-100/70">MYSPACE · PRIVATE SPACE</p>
+        <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-white">Chào mừng trở lại</h1>
+        <label class="sr-only" for="unlock-password">Mật khẩu</label>
+        <input id="unlock-password" class="lock-input relative z-[1] mt-7" type="password" inputmode="numeric" autocomplete="current-password" maxlength="64" placeholder="••••" aria-label="Mật khẩu">
+        <button class="lock-button relative z-[1] mt-5 w-full py-3.5 text-sm font-extrabold" type="submit"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i>Mở khóa</button>
+      </div>
+    </form>
+  </section>
+  <div id="mobile-shade" class="fixed inset-0 z-30 hidden bg-black/60 md:hidden"></div>
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-line bg-surface px-4 py-5 md:translate-x-0">
+    <a href="#home" class="mb-8 flex items-center gap-3 px-2">
+      <span class="flex h-10 w-10 items-center justify-center rounded-[14px] bg-lime text-lg font-black text-night"><i class="fa-solid fa-layer-group"></i></span>
+      <span><span class="block text-[15px] font-extrabold tracking-tight">MySpace<span class="text-lime">.</span></span><span class="mono mt-0.5 block text-[9px] uppercase tracking-[.2em] text-muted">PERSONAL DASHBOARD</span></span>
+    </a>
+    <p class="mono mb-3 px-3 text-[9px] uppercase tracking-[.2em] text-muted">Workspace</p>
+    <nav id="main-nav" class="space-y-1">
+      <button class="nav-item active flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-bold text-slate-300" data-page="home"><i class="fa-solid fa-house w-5 text-center"></i> Tổng quan</button>
+      <button class="nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-bold text-slate-300" data-page="schedule"><i class="fa-solid fa-calendar-days w-5 text-center"></i> Thời khóa biểu</button>
+      <button class="nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-bold text-slate-300" data-page="money"><i class="fa-solid fa-wallet w-5 text-center"></i> Chi tiêu</button>
+      <button class="nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-bold text-slate-300" data-page="lessons"><i class="fa-solid fa-book-open w-5 text-center"></i> Góc bài học</button>
+      <button class="nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-bold text-slate-300" data-page="notes"><i class="fa-solid fa-note-sticky w-5 text-center"></i> Ghi chú & việc làm</button>
+      <button class="nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-bold text-slate-300" data-page="health"><i class="fa-solid fa-heart-pulse w-5 text-center"></i> Sức khỏe</button>
+    </nav>
+    <div class="mt-auto space-y-3">
+      <div class="rounded-2xl border border-lime/15 bg-lime/[.06] p-4">
+        <div class="flex items-center gap-2 text-xs font-bold text-lime"><i class="fa-solid fa-shield-halved"></i> Dữ liệu của bạn</div>
+        <p class="mt-2 text-[10px] leading-5 text-slate-400">Tự lưu trên trình duyệt này. Ảnh được lưu riêng bằng IndexedDB.</p>
+      </div>
+      <button id="export-btn" class="btn-quiet w-full"><i class="fa-solid fa-download text-lime"></i> Sao lưu dữ liệu (Export JSON)</button>
+      <button id="import-btn" class="btn-quiet w-full"><i class="fa-solid fa-upload text-lilac"></i> Khôi phục dữ liệu (Import JSON)</button>
+      <button id="change-password-btn" class="btn-quiet w-full"><i class="fa-solid fa-key text-aqua"></i> Đổi mật khẩu</button>
+      <button id="lock-now-btn" class="btn-quiet w-full"><i class="fa-solid fa-lock text-coral"></i> Khóa màn hình ngay</button>
+      <input id="import-file" class="hidden" type="file" accept="application/json,.json">
+      <p class="text-center text-[9px] text-slate-600">Bản sao lưu nên được giữ ở nơi an toàn.</p>
+    </div>
+  </aside>
+
+  <div class="min-h-screen md:pl-[260px]">
+    <header class="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-line bg-night/90 px-4 backdrop-blur-xl sm:px-7">
+      <div class="flex items-center gap-3">
+        <button id="mobile-menu" class="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-slate-300 md:hidden" aria-label="Mở menu"><i class="fa-solid fa-bars"></i></button>
+        <div><p id="top-title" class="text-sm font-extrabold">Tổng quan</p><p class="mono mt-0.5 text-[9px] uppercase tracking-[.15em] text-muted">YOUR SPACE, YOUR PACE</p></div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="header-date" class="hidden text-xs text-muted sm:inline"></span>
+        <span class="flex h-9 w-9 items-center justify-center rounded-full border border-lime/20 bg-lime/10 text-lime"><i class="fa-solid fa-user"></i></span>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8">
+      <section id="page-home" class="view active">
+        <div class="mb-7 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+          <div><p class="mono text-[10px] uppercase tracking-[.2em] text-lime">YOUR DAILY OVERVIEW</p><h1 class="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Chào ngày mới <span class="text-lime">✨</span></h1><p id="welcome-date" class="mt-2 text-sm text-muted"></p></div>
+          <div class="panel soft-grid flex items-center gap-4 px-5 py-3.5"><i class="fa-regular fa-clock text-xl text-lime"></i><div><p id="clock" class="mono text-2xl font-medium tracking-tight">--:--:--</p><p class="text-[9px] uppercase tracking-[.18em] text-muted">Giờ hiện tại</p></div></div>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article class="panel p-5"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-muted">Môn học hôm nay</span><i class="fa-solid fa-book-open text-aqua"></i></div><p id="home-classes" class="mt-4 text-3xl font-extrabold">0</p><p class="mt-1 text-[10px] text-muted">tiết học trong lịch</p></article>
+          <article class="panel p-5"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-muted">Việc cần làm gấp</span><i class="fa-solid fa-list-check text-coral"></i></div><p id="home-todos" class="mt-4 text-3xl font-extrabold">0</p><p class="mt-1 text-[10px] text-muted">việc chưa hoàn thành hôm nay</p></article>
+          <article class="panel p-5"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-muted">Tiền sinh hoạt còn</span><i class="fa-solid fa-wallet text-lime"></i></div><p id="home-balance" class="mt-4 truncate text-2xl font-extrabold">0 ₫</p><p class="mt-1 text-[10px] text-muted">theo tháng hiện tại</p></article>
+          <article class="panel p-5"><div class="flex items-center justify-between"><span class="text-xs font-semibold text-muted">Cân nặng mới nhất</span><i class="fa-solid fa-weight-scale text-lilac"></i></div><p id="home-weight" class="mt-4 text-3xl font-extrabold">—</p><p class="mt-1 text-[10px] text-muted">kg · cập nhật lần gần nhất</p></article>
+        </div>
+        <div class="mt-5 grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
+          <section class="panel p-5 sm:p-6"><div class="flex items-center justify-between"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-lime">TODAY</p><h2 class="mt-1 text-lg font-extrabold">Lịch trình hôm nay</h2></div><button class="btn-quiet" data-go="schedule">Thời khóa biểu <i class="fa-solid fa-arrow-right"></i></button></div><div id="today-schedule" class="mt-5 space-y-3"></div></section>
+          <section class="panel p-5 sm:p-6"><div class="flex items-center justify-between"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-coral">FOCUS</p><h2 class="mt-1 text-lg font-extrabold">Việc ưu tiên</h2></div><button class="btn-quiet" data-go="notes">Xem tất cả</button></div><div id="today-priorities" class="mt-5 space-y-3"></div></section>
+        </div>
+        <section class="panel mt-5 p-5 sm:p-6"><div class="flex flex-wrap items-center justify-between gap-3"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-aqua">QUICK LINKS</p><h2 class="mt-1 text-lg font-extrabold">Liên kết nhanh</h2></div><button id="add-link" class="btn-quiet"><i class="fa-solid fa-plus text-lime"></i> Thêm liên kết</button></div><div id="quick-links" class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div></section>
+      </section>
+
+      <section id="page-schedule" class="view">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4"><div><p class="mono text-[10px] uppercase tracking-[.2em] text-aqua">PLAN YOUR WEEK</p><h1 class="mt-2 text-3xl font-extrabold">Thời khóa biểu</h1><p class="mt-2 text-sm text-muted">Chọn ô lịch để thêm hoặc chỉnh sửa môn học.</p></div><button id="add-exam" class="btn-quiet"><i class="fa-solid fa-hourglass-half text-coral"></i> Thêm kỳ thi</button></div>
+        <div class="panel overflow-hidden"><div class="overflow-x-auto"><table class="w-full border-collapse text-left"><thead><tr class="bg-card"><th class="table-cell sticky left-0 z-10 bg-card text-xs text-muted">Buổi</th><th class="table-cell text-xs font-bold">Thứ 2</th><th class="table-cell text-xs font-bold">Thứ 3</th><th class="table-cell text-xs font-bold">Thứ 4</th><th class="table-cell text-xs font-bold">Thứ 5</th><th class="table-cell text-xs font-bold">Thứ 6</th><th class="table-cell text-xs font-bold">Thứ 7</th><th class="table-cell text-xs font-bold">Chủ nhật</th></tr></thead><tbody id="schedule-body"></tbody></table></div></div>
+        <section class="panel mt-5 p-5"><div class="flex items-center gap-2"><i class="fa-solid fa-flag text-coral"></i><h2 class="font-extrabold">Đếm ngược ngày thi</h2></div><div id="exam-list" class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"></div></section>
+      </section>
+
+      <section id="page-money" class="view">
+        <div class="mb-6"><p class="mono text-[10px] uppercase tracking-[.2em] text-lime">MONEY MANAGEMENT</p><h1 class="mt-2 text-3xl font-extrabold">Chi tiêu & tiền sinh hoạt</h1><p class="mt-2 text-sm text-muted">Theo dõi thu chi và chủ động với ngân sách tháng.</p></div>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article class="panel p-5"><p class="text-xs text-muted">Ngân sách đầu tháng</p><p id="budget-value" class="mt-3 text-xl font-extrabold">0 ₫</p></article>
+          <article class="panel p-5"><p class="text-xs text-muted">Tổng thu tháng này</p><p id="income-total" class="mt-3 text-xl font-extrabold text-aqua">0 ₫</p></article>
+          <article class="panel p-5"><p class="text-xs text-muted">Tổng chi tháng này</p><p id="expense-total" class="mt-3 text-xl font-extrabold text-coral">0 ₫</p></article>
+          <article class="panel p-5"><p class="text-xs text-muted">Số dư hiện tại</p><p id="money-balance" class="mt-3 text-xl font-extrabold text-lime">0 ₫</p></article>
+        </div>
+        <section class="panel mt-5 p-5 sm:p-6"><div class="flex flex-wrap items-center justify-between gap-4"><div><h2 class="font-extrabold">Tỷ lệ sử dụng ngân sách</h2><p id="budget-caption" class="mt-1 text-xs text-muted">Thiết lập ngân sách để bắt đầu theo dõi.</p></div><div class="flex gap-2"><input id="budget-input" class="input max-w-48" type="number" min="0" step="10000" placeholder="Ngân sách tháng (₫)"><button id="save-budget" class="btn-primary">Lưu ngân sách</button></div></div><div class="mt-5 h-3 overflow-hidden rounded-full bg-card"><div id="budget-bar" class="h-full rounded-full bg-lime transition-all duration-500" style="width:0%"></div></div></section>
+        <section class="panel mt-5 p-5 sm:p-6"><div class="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-extrabold">Thêm giao dịch</h2><p class="mt-1 text-xs text-muted">Nhập khoản thu hoặc chi của bạn.</p></div></div>
+          <form id="transaction-form" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <label class="text-[10px] text-muted">Loại giao dịch<select name="type" class="input mt-1.5"><option value="expense">Chi tiêu</option><option value="income">Thu nhập</option></select></label>
+            <label class="text-[10px] text-muted">Số tiền (₫)<input name="amount" class="input mt-1.5" type="number" min="1" step="1000" required placeholder="50.000"></label>
+            <label class="text-[10px] text-muted">Ngày giờ<input name="date" class="input mt-1.5" type="datetime-local" required></label>
+            <label class="text-[10px] text-muted">Danh mục<select name="category" class="input mt-1.5"><option>Ăn uống</option><option>Đi lại</option><option>Học tập</option><option>Sinh hoạt</option><option>Lương / trợ cấp</option><option>Khác</option></select></label>
+            <label class="text-[10px] text-muted">Ghi chú<input name="note" class="input mt-1.5" maxlength="160" placeholder="Ghi chú giao dịch"></label>
+            <button class="btn-primary self-end" type="submit"><i class="fa-solid fa-plus"></i> Thêm giao dịch</button>
+          </form>
+        </section>
+        <section class="panel mt-5 overflow-hidden"><div class="flex items-center justify-between p-5"><h2 class="font-extrabold">Lịch sử giao dịch tháng này</h2><span id="transaction-count" class="mono text-[10px] text-muted"></span></div><div class="overflow-x-auto"><table class="w-full min-w-[650px] text-left text-xs"><thead class="border-y border-line bg-card text-muted"><tr><th class="px-5 py-3 font-semibold">Ngày</th><th class="px-4 py-3 font-semibold">Danh mục</th><th class="px-4 py-3 font-semibold">Ghi chú</th><th class="px-4 py-3 font-semibold">Loại</th><th class="px-5 py-3 text-right font-semibold">Số tiền</th><th class="px-4 py-3"></th></tr></thead><tbody id="transactions"></tbody></table></div></section>
+      </section>
+
+      <section id="page-lessons" class="view">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-4"><div><p class="mono text-[10px] uppercase tracking-[.2em] text-lilac">LEARNING JOURNAL</p><h1 class="mt-2 text-3xl font-extrabold">Góc bài học</h1><p class="mt-2 text-sm text-muted">Lưu kiến thức, hình ảnh bảng và slide của bạn.</p></div><button id="new-lesson" class="btn-primary"><i class="fa-solid fa-pen-to-square"></i> Viết bài mới</button></div>
+        <div class="panel mb-5 grid gap-3 p-4 sm:grid-cols-[1fr_220px]"><label class="relative"><i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-muted"></i><input id="lesson-search" class="input pl-11" placeholder="Tìm theo tiêu đề hoặc nội dung..."></label><select id="lesson-filter" class="input"><option value="">Tất cả môn học</option></select></div>
+        <div id="lesson-list" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"></div>
+      </section>
+
+      <section id="page-notes" class="view">
+        <div class="mb-6"><p class="mono text-[10px] uppercase tracking-[.2em] text-coral">STAY ON TRACK</p><h1 class="mt-2 text-3xl font-extrabold">Ghi chú & việc cần làm</h1><p class="mt-2 text-sm text-muted">Gom việc quan trọng và ý tưởng nhanh vào một nơi.</p></div>
+        <div class="grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
+          <section class="panel p-5 sm:p-6"><div class="flex items-center justify-between"><div><h2 class="font-extrabold">Việc cần làm</h2><p id="todo-progress" class="mt-1 text-xs text-muted"></p></div><i class="fa-solid fa-list-check text-coral"></i></div>
+            <form id="todo-form" class="mt-5 flex gap-2"><input name="text" class="input" maxlength="180" required placeholder="Thêm việc cần làm..."><button class="btn-primary shrink-0" type="submit" aria-label="Thêm việc"><i class="fa-solid fa-plus"></i></button></form>
+            <div id="todo-list" class="mt-4 space-y-2"></div>
+          </section>
+          <section class="panel p-5 sm:p-6"><div class="flex items-center justify-between"><div><h2 class="font-extrabold">Sticky notes</h2><p class="mt-1 text-xs text-muted">Ghi nhanh điều bạn muốn nhớ.</p></div><button id="add-note" class="btn-quiet"><i class="fa-solid fa-plus text-lime"></i> Tạo ghi chú</button></div><div id="sticky-list" class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div></section>
+        </div>
+      </section>
+
+      <section id="page-health" class="view">
+        <div class="mb-6"><p class="mono text-[10px] uppercase tracking-[.2em] text-aqua">WELLNESS TRACKER</p><h1 class="mt-2 text-3xl font-extrabold">Sức khỏe & cân nặng</h1><p class="mt-2 text-sm text-muted">Theo dõi thói quen nhỏ và tiến trình của bạn.</p></div>
+        <div class="grid gap-4 sm:grid-cols-3"><article class="panel p-5"><p class="text-xs text-muted">Cân nặng mới nhất</p><p id="health-weight" class="mt-3 text-3xl font-extrabold">— <span class="text-sm font-semibold text-muted">kg</span></p></article><article class="panel p-5"><p class="text-xs text-muted">BMI gần nhất</p><p id="health-bmi" class="mt-3 text-3xl font-extrabold">—</p><p id="bmi-label" class="mt-1 text-[10px] text-muted">Nhập chiều cao và cân nặng để tính</p></article><article class="panel p-5"><p class="text-xs text-muted">Lượng nước hôm nay</p><p class="mt-3"><span id="water-count" class="text-3xl font-extrabold">0</span><span class="ml-1 text-sm text-muted">/ 8 cốc</span></p><div class="mt-3 flex gap-1.5" id="water-cups"></div></article></div>
+        <div class="mt-5 grid gap-5 xl:grid-cols-[.7fr_1.3fr]">
+          <section class="panel p-5 sm:p-6"><div class="flex items-center justify-between"><h2 class="font-extrabold">Cập nhật chỉ số</h2><i class="fa-solid fa-heart-pulse text-aqua"></i></div><form id="health-form" class="mt-5 space-y-4"><label class="block text-[10px] text-muted">Ngày<input name="date" class="input mt-1.5" type="date" required></label><label class="block text-[10px] text-muted">Cân nặng (kg)<input name="weight" class="input mt-1.5" type="number" min="1" max="500" step="0.1" required placeholder="65.5"></label><label class="block text-[10px] text-muted">Chiều cao (cm)<input name="height" class="input mt-1.5" type="number" min="50" max="250" step="0.1" required placeholder="170"></label><button class="btn-primary w-full" type="submit"><i class="fa-solid fa-floppy-disk"></i> Lưu chỉ số</button></form></section>
+          <section class="panel p-5 sm:p-6"><div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-extrabold">Lịch sử cân nặng</h2><p class="mt-1 text-xs text-muted">Biểu đồ theo dõi các lần cập nhật</p></div><span class="mono text-[9px] uppercase tracking-[.15em] text-aqua">WEIGHT · KG</span></div><div class="mt-4 h-[250px]"><canvas id="weight-chart" class="h-full w-full"></canvas></div></section>
+        </div>
+        <section class="panel mt-5 p-5 sm:p-6"><div class="flex items-center justify-between"><div><h2 class="font-extrabold">Nhật ký chỉ số</h2><p class="mt-1 text-xs text-muted">Cân nặng, chiều cao và BMI theo ngày.</p></div><i class="fa-solid fa-chart-line text-lilac"></i></div><div id="health-history" class="mt-4 space-y-2"></div></section>
+      </section>
+    </main>
+  </div>
+  <div id="toast-stack" class="fixed bottom-4 right-4 z-[80] space-y-2"></div>
+  <dialog id="editor-dialog"><div id="dialog-content" class="max-h-[90vh] overflow-y-auto"></div></dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "myspace-dashboard-v1";
+      const LOCK_PASSWORD_KEY = "myspace-lock-password-v1";
+      const DB_NAME = "myspace-dashboard-media";
+      const DB_VERSION = 1;
+      const STORE_NAME = "images";
+      const PAGE_TITLES = { home: "Tổng quan", schedule: "Thời khóa biểu", money: "Chi tiêu", lessons: "Góc bài học", notes: "Ghi chú & việc làm", health: "Sức khỏe" };
+      const DAY_NAMES = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+      const SLOT_NAMES = ["Sáng", "Chiều", "Tối"];
+      const COLORS = ["#c5f467", "#b8a4ff", "#ff9178", "#72d9d0", "#ffd166"];
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+      const today = () => localDateString(new Date());
+      const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      let state;
+      let dbPromise;
+      let lockHideTimer;
+      let invalidPasswordTimer;
+
+      function localDateString(date) {
+        const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return d.toISOString().slice(0, 10);
+      }
+      function defaultState() {
+        return { version: 1, budget: {}, transactions: [], schedule: {}, exams: [], lessons: [], todos: [], notes: [], health: [], water: {}, quickLinks: [] };
+      }
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return defaultState();
+          const parsed = JSON.parse(raw);
+          const defaults = defaultState();
+          Object.keys(defaults).forEach(key => { if (parsed[key] === undefined || parsed[key] === null) parsed[key] = defaults[key]; });
+          return parsed;
+        } catch (error) {
+          console.error("Không thể đọc dữ liệu dashboard từ LocalStorage.", error);
+          notify("Không đọc được dữ liệu lưu trên trình duyệt. Hãy sao lưu hoặc kiểm tra cài đặt lưu trữ.", "error");
+          return defaultState();
+        }
+      }
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (error) {
+          console.error("Không thể lưu dữ liệu dashboard vào LocalStorage.", error);
+          notify("Không thể lưu dữ liệu. Có thể bộ nhớ trình duyệt đã đầy; hãy sao lưu và giải phóng dung lượng.", "error");
+          throw error;
+        }
+      }
+      function openDatabase() {
+        if (!("indexedDB" in window)) return Promise.reject(new Error("Trình duyệt này không hỗ trợ IndexedDB."));
+        if (!dbPromise) {
+          dbPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = () => {
+              const database = request.result;
+              if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME, { keyPath: "id" });
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error || new Error("Không thể mở cơ sở dữ liệu ảnh."));
+          });
+        }
+        return dbPromise;
+      }
+      async function imageTransaction(mode, callback) {
+        const database = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const transaction = database.transaction(STORE_NAME, mode);
+          const store = transaction.objectStore(STORE_NAME);
+          let result;
+          try { result = callback(store); } catch (error) { reject(error); return; }
+          transaction.oncomplete = () => resolve(result && result.result !== undefined ? result.result : result);
+          transaction.onerror = () => reject(transaction.error || new Error("Thao tác với ảnh thất bại."));
+          transaction.onabort = () => reject(transaction.error || new Error("Thao tác với ảnh đã bị hủy."));
+        });
+      }
+      async function putImage(record) { return imageTransaction("readwrite", store => store.put(record)); }
+      async function getImage(id) {
+        if (!id) return null;
+        const database = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const request = database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(id);
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error || new Error("Không thể đọc ảnh."));
+        });
+      }
+      async function getAllImages() {
+        const database = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const request = database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
+          request.onsuccess = () => resolve(request.result || []);
+          request.onerror = () => reject(request.error || new Error("Không thể đọc thư viện ảnh."));
+        });
+      }
+      async function deleteImage(id) {
+        if (id) await imageTransaction("readwrite", store => store.delete(id));
+      }
+      async function replaceImages(records) {
+        const database = await openDatabase();
+        return new Promise((resolve, reject) => {
+          const transaction = database.transaction(STORE_NAME, "readwrite");
+          const store = transaction.objectStore(STORE_NAME);
+          store.clear();
+          records.forEach(record => store.put(record));
+          transaction.oncomplete = resolve;
+          transaction.onerror = () => reject(transaction.error || new Error("Không thể khôi phục thư viện ảnh."));
+          transaction.onabort = () => reject(transaction.error || new Error("Khôi phục ảnh đã bị hủy."));
+        });
+      }
+      function notify(message, type = "success") {
+        const item = document.createElement("div");
+        item.className = `toast max-w-sm rounded-xl border px-4 py-3 text-xs shadow-2xl ${type === "error" ? "border-coral/30 bg-[#241714] text-coral" : "border-lime/20 bg-[#171d14] text-lime"}`;
+        item.textContent = message;
+        $("#toast-stack").append(item);
+        window.setTimeout(() => item.remove(), 4200);
+      }
+      function currentLockPassword() {
+        return localStorage.getItem(LOCK_PASSWORD_KEY) || "1234";
+      }
+      function lockScreen() {
+        const screen = $("#lock-screen");
+        const glass = $(".lock-glass", screen);
+        const input = $("#unlock-password");
+        const frame = $("#sylva-bg-frame");
+        window.clearTimeout(lockHideTimer);
+        frame.style.display = "block";
+        screen.style.display = "grid";
+        screen.classList.remove("unlocked");
+        glass.classList.remove("melting");
+        input.classList.remove("invalid");
+        input.value = "";
+        window.lockScreenLocked = true;
+        window.requestAnimationFrame(() => input.focus());
+      }
+      function bindLockScreen() {
+        const screen = $("#lock-screen");
+        const glass = $(".lock-glass", screen);
+        const input = $("#unlock-password");
+        const frame = $("#sylva-bg-frame");
+        window.lockScreenLocked = true;
+        const rejectPassword = () => {
+          window.clearTimeout(invalidPasswordTimer);
+          input.classList.remove("invalid");
+          void input.offsetWidth;
+          input.classList.add("invalid");
+          input.select();
+          invalidPasswordTimer = window.setTimeout(() => {
+            input.classList.remove("invalid");
+            input.value = "";
+            input.focus();
+          }, 400);
+        };
+        $("#unlock-form").addEventListener("submit", event => {
+          event.preventDefault();
+          let password;
+          try { password = currentLockPassword(); }
+          catch (error) {
+            console.error("Không thể đọc mật khẩu màn hình khóa.", error);
+            rejectPassword();
+            return;
+          }
+          if (input.value !== password) {
+            rejectPassword();
+            return;
+          }
+          glass.classList.add("melting");
+          screen.classList.add("unlocked");
+          window.lockScreenLocked = false;
+          lockHideTimer = window.setTimeout(() => {
+            if (!screen.classList.contains("unlocked")) return;
+            screen.style.display = "none";
+            frame.style.display = "none";
+          }, 500);
+        });
+        input.addEventListener("animationend", () => {
+          if (!input.classList.contains("invalid")) return;
+          window.clearTimeout(invalidPasswordTimer);
+          input.classList.remove("invalid");
+          input.value = "";
+          input.focus();
+        });
+        glass.addEventListener("pointermove", event => {
+          const bounds = glass.getBoundingClientRect();
+          glass.style.setProperty("--shine-x", `${event.clientX - bounds.left}px`);
+          glass.style.setProperty("--shine-y", `${event.clientY - bounds.top}px`);
+        });
+        const relayPointer = event => {
+          if (!window.lockScreenLocked || !frame.contentWindow) return;
+          frame.contentWindow.postMessage({
+            channel: "myspace-lock-pointer",
+            type: event.type,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            button: event.button,
+            buttons: event.buttons,
+            pressure: event.pressure,
+            isPrimary: event.isPrimary
+          }, "*");
+        };
+        window.addEventListener("pointermove", relayPointer, true);
+        window.addEventListener("pointerdown", relayPointer, true);
+        $("#lock-now-btn").addEventListener("click", lockScreen);
+        $("#change-password-btn").addEventListener("click", openPasswordDialog);
+      }
+      function openPasswordDialog() {
+        openDialog(`<form id="password-editor" class="w-[min(92vw,440px)] p-6"><div class="mb-5 flex items-center justify-between"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-aqua">SECURITY</p><h2 class="mt-1 text-xl font-extrabold">Đổi mật khẩu</h2></div><button type="button" class="dialog-close btn-quiet !px-3 !py-2" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div><label class="mb-4 block text-[10px] text-muted">Mật khẩu hiện tại<input class="input mt-1.5" name="current" type="password" minlength="4" maxlength="64" required autocomplete="current-password"></label><label class="mb-4 block text-[10px] text-muted">Mật khẩu mới<input class="input mt-1.5" name="next" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label><label class="block text-[10px] text-muted">Xác nhận mật khẩu mới<input class="input mt-1.5" name="confirm" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label><p class="mt-3 text-[10px] leading-5 text-muted">Mật khẩu được lưu trên trình duyệt này; màn hình khóa chỉ bảo vệ giao diện, không mã hóa dữ liệu.</p><button class="btn-primary mt-5 w-full" type="submit"><i class="fa-solid fa-key"></i>Lưu mật khẩu mới</button></form>`);
+        $("#password-editor").addEventListener("submit", event => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          if (form.elements.current.value !== currentLockPassword()) {
+            notify("Mật khẩu hiện tại không đúng.", "error");
+            form.elements.current.select();
+            return;
+          }
+          if (form.elements.next.value !== form.elements.confirm.value) {
+            notify("Mật khẩu xác nhận chưa khớp.", "error");
+            form.elements.confirm.select();
+            return;
+          }
+          try {
+            localStorage.setItem(LOCK_PASSWORD_KEY, form.elements.next.value);
+          } catch (error) {
+            console.error("Không thể lưu mật khẩu màn hình khóa.", error);
+            notify("Không thể lưu mật khẩu. Hãy kiểm tra quyền lưu trữ của trình duyệt.", "error");
+            return;
+          }
+          closeDialog();
+          notify("Đã đổi mật khẩu màn hình khóa.");
+        });
+        bindDialogClose();
+      }
+      function esc(value) {
+        return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+      }
+      function money(value) {
+        return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(Number(value) || 0) + " ₫";
+      }
+      function formatDate(value, options = { day: "2-digit", month: "2-digit", year: "numeric" }) {
+        if (!value) return "—";
+        const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+        return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("vi-VN", options).format(date);
+      }
+      function openDialog(content) {
+        $("#dialog-content").innerHTML = content;
+        const dialog = $("#editor-dialog");
+        if (!dialog.open) dialog.showModal();
+      }
+      function closeDialog() {
+        const dialog = $("#editor-dialog");
+        if (dialog.open) dialog.close();
+      }
+      function render() {
+        renderHome();
+        renderSchedule();
+        renderMoney();
+        renderLessons();
+        renderNotes();
+        renderHealth();
+      }
+      function showPage(page) {
+        if (!PAGE_TITLES[page]) return;
+        $$(".view").forEach(el => el.classList.toggle("active", el.id === `page-${page}`));
+        $$(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.page === page));
+        $("#top-title").textContent = PAGE_TITLES[page];
+        history.replaceState(null, "", `#${page}`);
+        closeMobileMenu();
+        if (page === "health") drawWeightChart();
+      }
+      function closeMobileMenu() {
+        $("#sidebar").classList.remove("mobile-open");
+        $("#mobile-shade").classList.add("hidden");
+      }
+      function getMonthTransactions() {
+        const prefix = today().slice(0, 7);
+        return state.transactions.filter(item => String(item.date || "").slice(0, 7) === prefix);
+      }
+      function totals() {
+        const transactions = getMonthTransactions();
+        const income = transactions.filter(item => item.type === "income").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const expense = transactions.filter(item => item.type === "expense").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+        const budget = Number(state.budget[today().slice(0, 7)] || 0);
+        return { transactions, income, expense, budget, balance: budget + income - expense };
+      }
+      function renderHome() {
+        const now = new Date();
+        $("#welcome-date").textContent = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(now);
+        $("#header-date").textContent = formatDate(today());
+        const day = now.getDay();
+        const classes = Object.entries(state.schedule).filter(([key, item]) => Number(key.split("-")[0]) === day && item && item.subject).map(([, item]) => item);
+        const todos = state.todos.filter(item => !item.done && (!item.date || item.date === today())).length;
+        const current = totals();
+        $("#home-classes").textContent = classes.length;
+        $("#home-todos").textContent = todos;
+        $("#home-balance").textContent = money(current.balance);
+        const latest = [...state.health].sort((a, b) => b.date.localeCompare(a.date))[0];
+        $("#home-weight").textContent = latest ? `${Number(latest.weight).toFixed(1)} kg` : "—";
+        const schedule = $("#today-schedule");
+        const slots = SLOT_NAMES.map((slot, index) => {
+          const item = state.schedule[`${day}-${index}`];
+          return item && item.subject ? `<div class="flex items-center gap-3 rounded-xl border border-line bg-card/60 p-3"><span class="mono w-14 text-[10px] text-muted">${esc(slot)}</span><span class="h-8 w-1 rounded-full bg-aqua"></span><div class="min-w-0 flex-1"><p class="truncate text-xs font-bold">${esc(item.subject)}</p><p class="mt-1 text-[10px] text-muted">${esc(item.time || "Chưa đặt giờ")}${item.room ? ` · ${esc(item.room)}` : ""}</p></div></div>` : "";
+        }).filter(Boolean).join("");
+        schedule.innerHTML = slots || emptyState("fa-mug-hot", "Hôm nay chưa có lịch học", "Bạn có thể thêm lịch trong Thời khóa biểu.");
+        const priorities = state.todos.filter(item => !item.done && (!item.date || item.date === today())).slice(0, 4);
+        $("#today-priorities").innerHTML = priorities.length ? priorities.map(todo => `<div class="flex items-center gap-3 rounded-xl border border-line bg-card/60 p-3"><span class="h-2 w-2 rounded-full bg-coral"></span><span class="min-w-0 flex-1 truncate text-xs font-semibold">${esc(todo.text)}</span>${todo.date ? `<span class="mono text-[9px] text-muted">${formatDate(todo.date, { day: "2-digit", month: "2-digit" })}</span>` : ""}</div>`).join("") : emptyState("fa-circle-check", "Bạn đã xong việc hôm nay", "Thêm việc mới trong mục Ghi chú & việc làm.");
+        $("#quick-links").innerHTML = state.quickLinks.length ? state.quickLinks.map(link => `<div class="group flex items-center gap-3 rounded-xl border border-line bg-card p-3 transition hover:border-lime/30"><a class="flex min-w-0 flex-1 items-center gap-3" href="${safeUrl(link.url)}" target="_blank" rel="noopener noreferrer"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-lime/10 text-lime"><i class="fa-solid ${link.icon === "school" ? "fa-graduation-cap" : "fa-link"}"></i></span><span class="min-w-0"><span class="block truncate text-xs font-bold">${esc(link.name)}</span><span class="block truncate text-[9px] text-muted">${esc(link.url)}</span></span></a><button class="delete-link p-2 text-muted opacity-0 transition hover:text-coral group-hover:opacity-100" data-id="${esc(link.id)}" aria-label="Xóa liên kết"><i class="fa-solid fa-xmark"></i></button></div>`).join("") : `<button id="empty-add-link" class="flex min-h-[65px] items-center justify-center gap-2 rounded-xl border border-dashed border-line text-xs text-muted transition hover:border-lime/40 hover:text-lime"><i class="fa-solid fa-plus"></i> Thêm Web trường hoặc cổng sinh viên</button>`;
+      }
+      function safeUrl(value) {
+        try {
+          const url = new URL(value);
+          return ["http:", "https:"].includes(url.protocol) ? esc(url.href) : "#";
+        } catch { return "#"; }
+      }
+      function emptyState(icon, title, detail) {
+        return `<div class="rounded-xl border border-dashed border-line px-4 py-6 text-center"><i class="fa-solid ${icon} text-lg text-muted/70"></i><p class="mt-2 text-xs font-bold text-slate-300">${title}</p><p class="mt-1 text-[10px] text-muted">${detail}</p></div>`;
+      }
+      function renderSchedule() {
+        $("#schedule-body").innerHTML = SLOT_NAMES.map((slot, slotIndex) => `<tr><th class="table-cell sticky left-0 z-10 bg-surface"><span class="block text-xs font-bold">${slot}</span><span class="mono mt-1 block text-[9px] font-normal text-muted">${["07—11", "13—17", "18—21"][slotIndex]}h</span></th>${Array.from({ length: 7 }, (_, index) => {
+          const day = index === 6 ? 0 : index + 1;
+          const item = state.schedule[`${day}-${slotIndex}`];
+          return `<td class="table-cell"><button class="slot schedule-slot text-left ${item && item.subject ? "border-transparent bg-aqua/[.08] p-2 text-slate-100" : ""}" data-day="${day}" data-slot="${slotIndex}">${item && item.subject ? `<span class="block line-clamp-2 text-[10px] font-bold">${esc(item.subject)}</span><span class="mt-1 block truncate text-[9px] text-muted">${esc(item.time || item.room || "Chạm để sửa")}</span>` : `<span class="flex h-full flex-col items-center justify-center gap-1 text-lg"><i class="fa-solid fa-plus text-sm"></i><small class="text-[8px]">Thêm môn</small></span>`}</button></td>`;
+        }).join("")}</tr>`).join("");
+        const exams = [...state.exams].sort((a, b) => a.date.localeCompare(b.date));
+        $("#exam-list").innerHTML = exams.length ? exams.map(exam => {
+          const days = Math.ceil((new Date(`${exam.date}T00:00:00`) - new Date(`${today()}T00:00:00`)) / 86400000);
+          const label = days < 0 ? `Đã qua ${Math.abs(days)} ngày` : days === 0 ? "Diễn ra hôm nay" : `Còn ${days} ngày`;
+          return `<article class="flex items-center gap-3 rounded-xl border border-line bg-card p-4"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-coral/10 text-coral"><i class="fa-solid fa-file-pen"></i></span><div class="min-w-0 flex-1"><p class="truncate text-xs font-bold">${esc(exam.name)}</p><p class="mt-1 text-[10px] text-muted">${formatDate(exam.date)}${exam.room ? ` · ${esc(exam.room)}` : ""}</p></div><div class="text-right"><p class="text-xs font-extrabold ${days >= 0 && days <= 7 ? "text-coral" : "text-lime"}">${label}</p><button class="delete-exam mt-1 text-[9px] text-muted hover:text-coral" data-id="${esc(exam.id)}">Xóa</button></div></article>`;
+        }).join("") : emptyState("fa-hourglass-start", "Chưa có kỳ thi nào", "Thêm ngày thi để theo dõi đếm ngược.");
+      }
+      function renderMoney() {
+        const { transactions, income, expense, budget, balance } = totals();
+        $("#budget-value").textContent = money(budget);
+        $("#income-total").textContent = money(income);
+        $("#expense-total").textContent = money(expense);
+        $("#money-balance").textContent = money(balance);
+        $("#budget-input").value = budget || "";
+        const ratio = budget > 0 ? expense / budget * 100 : 0;
+        $("#budget-bar").style.width = `${Math.min(ratio, 100)}%`;
+        $("#budget-bar").className = `h-full rounded-full transition-all duration-500 ${ratio >= 100 ? "bg-coral" : ratio >= 80 ? "bg-yellow-400" : "bg-lime"}`;
+        $("#budget-caption").textContent = budget ? `${ratio.toFixed(1)}% ngân sách đã sử dụng${ratio >= 80 ? " · Bạn đang tiến gần giới hạn ngân sách." : ""}` : "Thiết lập ngân sách để bắt đầu theo dõi.";
+        $("#transaction-count").textContent = `${transactions.length} giao dịch`;
+        $("#transactions").innerHTML = transactions.length ? [...transactions].sort((a, b) => b.date.localeCompare(a.date)).map(item => `<tr class="border-b border-line/70 last:border-0"><td class="px-5 py-3 text-slate-300">${formatDate(item.date)}</td><td class="px-4 py-3">${esc(item.category)}</td><td class="max-w-[200px] truncate px-4 py-3 text-muted">${esc(item.note || "—")}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[9px] font-bold ${item.type === "income" ? "bg-aqua/10 text-aqua" : "bg-coral/10 text-coral"}">${item.type === "income" ? "Thu" : "Chi"}</span></td><td class="px-5 py-3 text-right font-bold ${item.type === "income" ? "text-aqua" : "text-slate-200"}">${item.type === "income" ? "+" : "−"}${money(item.amount)}</td><td class="px-4 py-3 text-right"><button class="delete-transaction text-muted hover:text-coral" data-id="${esc(item.id)}" aria-label="Xóa giao dịch"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join("") : `<tr><td colspan="6" class="px-5 py-10 text-center text-xs text-muted">Chưa có giao dịch trong tháng này.</td></tr>`;
+        const dateInput = $("#transaction-form").elements.date;
+        if (!dateInput.value) dateInput.value = `${today()}T${new Date().toTimeString().slice(0, 5)}`;
+      }
+      function renderLessons() {
+        const selected = $("#lesson-filter").value;
+        const query = $("#lesson-search").value.trim().toLocaleLowerCase("vi");
+        const subjects = [...new Set(state.lessons.map(item => item.subject).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi"));
+        $("#lesson-filter").innerHTML = `<option value="">Tất cả môn học</option>${subjects.map(subject => `<option value="${esc(subject)}">${esc(subject)}</option>`).join("")}`;
+        $("#lesson-filter").value = subjects.includes(selected) ? selected : "";
+        const lessons = [...state.lessons].filter(item => (!$("#lesson-filter").value || item.subject === $("#lesson-filter").value) && (!query || `${item.title} ${item.subject} ${item.content}`.toLocaleLowerCase("vi").includes(query))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        $("#lesson-list").innerHTML = lessons.length ? lessons.map(lesson => `<article class="group overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-1 hover:border-lilac/35"><button class="lesson-open block w-full text-left" data-id="${esc(lesson.id)}"><div class="relative h-44 overflow-hidden bg-card">${lesson.coverId ? `<img data-image-id="${esc(lesson.coverId)}" alt="" class="h-full w-full object-cover transition duration-500 group-hover:scale-105">` : `<div class="soft-grid flex h-full items-center justify-center text-4xl text-lilac/40"><i class="fa-solid fa-book-open"></i></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div><span class="absolute bottom-3 left-3 rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[9px] font-bold text-lilac backdrop-blur">${esc(lesson.subject || "Chưa phân loại")}</span></div><div class="p-4"><h3 class="line-clamp-2 font-extrabold">${esc(lesson.title)}</h3><p class="mt-2 line-clamp-2 text-xs leading-5 text-muted">${esc(lesson.content.slice(0, 150)) || "Chưa có nội dung."}</p><p class="mono mt-4 text-[9px] uppercase tracking-[.12em] text-slate-600">${formatDate(lesson.updatedAt)}</p></div></button><div class="flex justify-end border-t border-line px-4 py-2"><button class="delete-lesson text-[10px] text-muted transition hover:text-coral" data-id="${esc(lesson.id)}"><i class="fa-solid fa-trash-can mr-1"></i> Xóa bài</button></div></article>`).join("") : emptyState("fa-book-open", "Chưa tìm thấy bài học", "Viết bài mới để lưu những điều bạn đã học.");
+        hydrateImages($("#lesson-list"));
+      }
+      async function hydrateImages(root) {
+        for (const image of $$("img[data-image-id]", root)) {
+          try {
+            const record = await getImage(image.dataset.imageId);
+            if (record && record.blob) image.src = URL.createObjectURL(record.blob);
+            else image.alt = "Ảnh không còn trong kho dữ liệu";
+          } catch (error) { console.error("Không thể hiển thị ảnh bài học.", error); }
+        }
+      }
+      function renderNotes() {
+        const open = state.todos.filter(item => !item.done).length;
+        $("#todo-progress").textContent = `${state.todos.filter(item => item.done).length} hoàn thành · ${open} còn lại`;
+        $("#todo-list").innerHTML = state.todos.length ? [...state.todos].sort((a, b) => Number(a.done) - Number(b.done) || (a.date || "9999").localeCompare(b.date || "9999")).map(todo => `<div class="group flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-3"><input class="todo-check h-4 w-4 accent-lime" type="checkbox" data-id="${esc(todo.id)}" ${todo.done ? "checked" : ""} aria-label="Đánh dấu hoàn thành"><span class="min-w-0 flex-1 text-xs ${todo.done ? "text-muted line-through" : "text-slate-200"}">${esc(todo.text)}${todo.date ? `<span class="ml-2 text-[9px] text-muted">${formatDate(todo.date)}</span>` : ""}</span><button class="delete-todo text-muted opacity-0 transition hover:text-coral group-hover:opacity-100" data-id="${esc(todo.id)}" aria-label="Xóa việc"><i class="fa-solid fa-xmark"></i></button></div>`).join("") : emptyState("fa-list-check", "Danh sách đang trống", "Thêm một việc nhỏ để bắt đầu.");
+        $("#sticky-list").innerHTML = state.notes.length ? [...state.notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(note => `<article class="sticky-note relative rounded-2xl border p-4" style="background:${esc(note.color)}12;border-color:${esc(note.color)}35"><span class="absolute right-3 top-3 h-2 w-2 rounded-full" style="background:${esc(note.color)}"></span><p class="whitespace-pre-wrap pr-4 text-xs leading-6 text-slate-200">${esc(note.text)}</p><div class="mt-4 flex items-center justify-between"><span class="mono text-[8px] uppercase tracking-widest text-muted">${formatDate(note.updatedAt)}</span><button class="delete-note text-muted transition hover:text-coral" data-id="${esc(note.id)}" aria-label="Xóa ghi chú"><i class="fa-solid fa-trash-can text-[10px]"></i></button></div></article>`).join("") : emptyState("fa-note-sticky", "Chưa có ghi chú nhanh", "Tạo thẻ để ghi lại ý tưởng.");
+      }
+      function renderHealth() {
+        const entries = [...state.health].sort((a, b) => b.date.localeCompare(a.date));
+        const latest = entries[0];
+        $("#health-weight").innerHTML = latest ? `${Number(latest.weight).toFixed(1)} <span class="text-sm font-semibold text-muted">kg</span>` : `— <span class="text-sm font-semibold text-muted">kg</span>`;
+        const bmi = latest && latest.height ? Number(latest.weight) / ((Number(latest.height) / 100) ** 2) : null;
+        $("#health-bmi").textContent = bmi ? bmi.toFixed(1) : "—";
+        $("#bmi-label").textContent = bmi ? bmi < 18.5 ? "Dưới mức tham khảo" : bmi < 25 ? "Trong khoảng tham khảo" : bmi < 30 ? "Trên mức tham khảo" : "Cao hơn mức tham khảo" : "Nhập chiều cao và cân nặng để tính";
+        const count = Number(state.water[today()] || 0);
+        $("#water-count").textContent = count;
+        $("#water-cups").innerHTML = Array.from({ length: 8 }, (_, index) => `<button class="water-cup flex h-9 w-8 items-center justify-center rounded-lg border transition ${index < count ? "border-aqua/30 bg-aqua/15 text-aqua" : "border-line bg-card text-muted hover:border-aqua/40"}" data-count="${index + 1}" aria-label="${index < count ? "Đã uống" : "Đánh dấu đã uống"} ${index + 1} cốc"><i class="fa-solid fa-glass-water text-xs"></i></button>`).join("");
+        $("#health-history").innerHTML = entries.length ? entries.map(item => `<div class="flex items-center gap-3 rounded-xl border border-line bg-card/60 px-4 py-3"><span class="flex h-9 w-9 items-center justify-center rounded-lg bg-lilac/10 text-lilac"><i class="fa-solid fa-scale-balanced"></i></span><span class="flex-1 text-xs font-bold">${formatDate(item.date)}</span><span class="text-xs text-slate-300">${Number(item.weight).toFixed(1)} kg</span><span class="text-xs text-muted">${Number(item.height).toFixed(1)} cm</span><span class="w-16 text-right text-xs font-bold text-aqua">${(Number(item.weight) / ((Number(item.height) / 100) ** 2)).toFixed(1)} BMI</span><button class="delete-health ml-2 text-muted hover:text-coral" data-id="${esc(item.id)}" aria-label="Xóa dữ liệu"><i class="fa-solid fa-xmark"></i></button></div>`).join("") : emptyState("fa-chart-line", "Chưa có dữ liệu sức khỏe", "Nhập cân nặng và chiều cao để bắt đầu.");
+        const dateInput = $("#health-form").elements.date;
+        if (!dateInput.value) dateInput.value = today();
+        drawWeightChart();
+      }
+      function drawWeightChart() {
+        const canvas = $("#weight-chart");
+        if (!canvas || !canvas.offsetWidth) return;
+        const rect = canvas.getBoundingClientRect();
+        const scale = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.floor(rect.width * scale));
+        canvas.height = Math.max(1, Math.floor(rect.height * scale));
+        const ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale);
+        const width = rect.width;
+        const height = rect.height;
+        const values = [...state.health].sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+        ctx.clearRect(0, 0, width, height);
+        if (!values.length) {
+          ctx.fillStyle = "#8b91a1";
+          ctx.font = "12px Manrope";
+          ctx.textAlign = "center";
+          ctx.fillText("Thêm dữ liệu để xem biểu đồ", width / 2, height / 2);
+          return;
+        }
+        const pad = { top: 24, right: 24, bottom: 34, left: 40 };
+        const weights = values.map(item => Number(item.weight));
+        const min = Math.min(...weights) - 1;
+        const max = Math.max(...weights) + 1;
+        const x = index => pad.left + (values.length === 1 ? (width - pad.left - pad.right) / 2 : index * (width - pad.left - pad.right) / (values.length - 1));
+        const y = weight => pad.top + (max - weight) * (height - pad.top - pad.bottom) / (max - min || 1);
+        ctx.strokeStyle = "#252a36";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+          const gy = pad.top + i * (height - pad.top - pad.bottom) / 3;
+          ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(width - pad.right, gy); ctx.stroke();
+        }
+        const gradient = ctx.createLinearGradient(0, pad.top, 0, height - pad.bottom);
+        gradient.addColorStop(0, "rgba(114,217,208,.25)");
+        gradient.addColorStop(1, "rgba(114,217,208,0)");
+        ctx.beginPath();
+        values.forEach((item, index) => index ? ctx.lineTo(x(index), y(Number(item.weight))) : ctx.moveTo(x(index), y(Number(item.weight))));
+        ctx.lineTo(x(values.length - 1), height - pad.bottom);
+        ctx.lineTo(x(0), height - pad.bottom);
+        ctx.closePath(); ctx.fillStyle = gradient; ctx.fill();
+        ctx.beginPath();
+        values.forEach((item, index) => index ? ctx.lineTo(x(index), y(Number(item.weight))) : ctx.moveTo(x(index), y(Number(item.weight))));
+        ctx.strokeStyle = "#72d9d0"; ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.stroke();
+        values.forEach((item, index) => {
+          ctx.beginPath(); ctx.arc(x(index), y(Number(item.weight)), 4, 0, Math.PI * 2); ctx.fillStyle = "#72d9d0"; ctx.fill();
+          ctx.fillStyle = "#8b91a1"; ctx.font = "9px 'DM Mono'"; ctx.textAlign = "center";
+          if (values.length <= 6 || index === 0 || index === values.length - 1 || index % 2 === 0) ctx.fillText(formatDate(item.date, { day: "2-digit", month: "2-digit" }), x(index), height - 10);
+        });
+      }
+
+      function editSchedule(day, slot) {
+        const item = state.schedule[`${day}-${slot}`] || {};
+        openDialog(`<form id="schedule-editor" class="w-[min(92vw,480px)] p-6"><div class="mb-5 flex items-center justify-between"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-aqua">WEEKLY SCHEDULE</p><h2 class="mt-1 text-xl font-extrabold">${item.subject ? "Chỉnh sửa lịch học" : "Thêm môn học"}</h2><p class="mt-1 text-xs text-muted">${DAY_NAMES[day]} · ${SLOT_NAMES[slot]}</p></div><button type="button" class="dialog-close btn-quiet !px-3 !py-2" aria-label="Đóng"><i class="fa-solid fa-xmark"></i></button></div><div class="space-y-3"><label class="block text-[10px] text-muted">Tên môn học<input name="subject" class="input mt-1.5" maxlength="100" value="${esc(item.subject || "")}" placeholder="Ví dụ: Cơ sở dữ liệu"></label><div class="grid grid-cols-2 gap-3"><label class="text-[10px] text-muted">Phòng học<input name="room" class="input mt-1.5" maxlength="60" value="${esc(item.room || "")}" placeholder="A.101"></label><label class="text-[10px] text-muted">Giờ học<input name="time" class="input mt-1.5" maxlength="40" value="${esc(item.time || "")}" placeholder="07:00 — 09:30"></label></div><label class="block text-[10px] text-muted">Ghi chú<input name="note" class="input mt-1.5" maxlength="120" value="${esc(item.note || "")}" placeholder="Thông tin thêm"></label></div><div class="mt-6 flex justify-between"><button type="button" id="delete-slot" class="btn-quiet text-coral ${item.subject ? "" : "invisible"}"><i class="fa-solid fa-trash-can"></i> Xóa</button><button class="btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Lưu lịch học</button></div></form>`);
+        $("#schedule-editor").addEventListener("submit", event => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const subject = form.elements.subject.value.trim();
+          const key = `${day}-${slot}`;
+          if (subject) state.schedule[key] = { subject, room: form.elements.room.value.trim(), time: form.elements.time.value.trim(), note: form.elements.note.value.trim() };
+          else delete state.schedule[key];
+          saveState(); closeDialog(); render(); notify(subject ? "Đã lưu lịch học." : "Đã xóa lịch học.");
+        });
+        $("#delete-slot").addEventListener("click", () => { delete state.schedule[`${day}-${slot}`]; saveState(); closeDialog(); render(); notify("Đã xóa lịch học."); });
+        bindDialogClose();
+      }
+      function addExam() {
+        openDialog(`<form id="exam-editor" class="w-[min(92vw,440px)] p-6"><div class="mb-5 flex items-center justify-between"><h2 class="text-xl font-extrabold">Thêm kỳ thi</h2><button type="button" class="dialog-close btn-quiet !px-3 !py-2"><i class="fa-solid fa-xmark"></i></button></div><div class="space-y-3"><label class="block text-[10px] text-muted">Tên môn / kỳ thi<input name="name" class="input mt-1.5" maxlength="100" required placeholder="Ví dụ: Thi cuối kỳ Giải tích"></label><label class="block text-[10px] text-muted">Ngày thi<input name="date" class="input mt-1.5" type="date" required></label><label class="block text-[10px] text-muted">Phòng thi<input name="room" class="input mt-1.5" maxlength="60" placeholder="Chưa có thông tin"></label></div><button class="btn-primary mt-6 w-full" type="submit">Lưu kỳ thi</button></form>`);
+        $("#exam-editor").addEventListener("submit", event => { event.preventDefault(); const f = event.currentTarget; state.exams.push({ id: newId(), name: f.elements.name.value.trim(), date: f.elements.date.value, room: f.elements.room.value.trim() }); saveState(); closeDialog(); render(); notify("Đã thêm kỳ thi."); });
+        bindDialogClose();
+      }
+      function addQuickLink() {
+        openDialog(`<form id="link-editor" class="w-[min(92vw,440px)] p-6"><div class="mb-5 flex items-center justify-between"><h2 class="text-xl font-extrabold">Thêm liên kết nhanh</h2><button type="button" class="dialog-close btn-quiet !px-3 !py-2"><i class="fa-solid fa-xmark"></i></button></div><div class="space-y-3"><label class="block text-[10px] text-muted">Tên liên kết<input name="name" class="input mt-1.5" maxlength="50" required placeholder="Web trường"></label><label class="block text-[10px] text-muted">Địa chỉ website<input name="url" class="input mt-1.5" type="url" required placeholder="https://..."></label><label class="block text-[10px] text-muted">Loại liên kết<select name="icon" class="input mt-1.5"><option value="school">Web trường</option><option value="link">Liên kết khác</option></select></label></div><button class="btn-primary mt-6 w-full" type="submit">Thêm liên kết</button></form>`);
+        $("#link-editor").addEventListener("submit", event => { event.preventDefault(); const f = event.currentTarget; const url = f.elements.url.value.trim(); if (!/^https?:\/\//i.test(url)) { notify("Liên kết cần bắt đầu bằng http:// hoặc https://.", "error"); return; } state.quickLinks.push({ id: newId(), name: f.elements.name.value.trim(), url, icon: f.elements.icon.value }); saveState(); closeDialog(); render(); notify("Đã thêm liên kết."); });
+        bindDialogClose();
+      }
+      async function compressImage(file) {
+        if (!file.type.startsWith("image/")) throw new Error(`${file.name} không phải là tệp hình ảnh.`);
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error(`Không thể đọc ảnh ${file.name}.`)); image.src = objectUrl; });
+          const maxSide = 1800;
+          const ratio = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.naturalWidth * ratio));
+          canvas.height = Math.max(1, Math.round(image.naturalHeight * ratio));
+          const context = canvas.getContext("2d", { alpha: false });
+          if (!context) throw new Error("Không thể tạo vùng nén ảnh trên trình duyệt.");
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error(`Không thể nén ảnh ${file.name}.`)), "image/jpeg", .82));
+          return { blob, width: canvas.width, height: canvas.height };
+        } finally { URL.revokeObjectURL(objectUrl); }
+      }
+      function newLesson() {
+        openDialog(`<form id="lesson-editor" class="w-[min(94vw,760px)] p-6 sm:p-8"><div class="mb-6 flex items-center justify-between"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-lilac">LEARNING JOURNAL</p><h2 class="mt-1 text-xl font-extrabold">Viết bài học mới</h2></div><button type="button" class="dialog-close btn-quiet !px-3 !py-2"><i class="fa-solid fa-xmark"></i></button></div><div class="space-y-4"><label class="block text-[10px] text-muted">Tiêu đề bài học<input name="title" class="input mt-1.5" maxlength="140" required placeholder="Hôm nay mình học được gì?"></label><label class="block text-[10px] text-muted">Tên môn học / Tag<input name="subject" class="input mt-1.5" maxlength="60" placeholder="Ví dụ: Lập trình web"></label><label class="block text-[10px] text-muted">Nội dung bài viết<textarea name="content" class="input mt-1.5 min-h-48 resize-y leading-6" maxlength="30000" placeholder="Viết nội dung, ý tưởng và điều bạn muốn ghi nhớ..."></textarea></label><label class="block text-[10px] text-muted">Tải nhiều hình ảnh từ máy tính lên bài viết<input name="images" class="input mt-1.5 file:mr-3 file:rounded-lg file:border-0 file:bg-lilac/10 file:px-3 file:py-2 file:text-[10px] file:font-bold file:text-lilac" type="file" accept="image/*" multiple><span class="mt-1.5 block text-[9px] text-muted">Ảnh được tự động thu nhỏ tối đa 1800px, nén JPEG và lưu trong IndexedDB.</span></label></div><div class="mt-6 flex justify-end"><button class="btn-primary" type="submit"><i class="fa-solid fa-cloud-arrow-up"></i> Lưu bài học</button></div></form>`);
+        $("#lesson-editor").addEventListener("submit", async event => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const submit = form.querySelector('[type="submit"]');
+          const files = [...form.elements.images.files];
+          if (files.length > 30) { notify("Bạn có thể thêm tối đa 30 ảnh cho mỗi bài viết.", "error"); return; }
+          submit.disabled = true;
+          submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nén và lưu...';
+          const imageIds = [];
+          try {
+            for (const file of files) {
+              const compressed = await compressImage(file);
+              const id = newId();
+              await putImage({ id, blob: compressed.blob, type: "image/jpeg", name: file.name, width: compressed.width, height: compressed.height, createdAt: new Date().toISOString() });
+              imageIds.push(id);
+            }
+            const lesson = { id: newId(), title: form.elements.title.value.trim(), subject: form.elements.subject.value.trim(), content: form.elements.content.value.trim(), imageIds, coverId: imageIds[0] || "", updatedAt: new Date().toISOString() };
+            state.lessons.push(lesson);
+            saveState(); closeDialog(); render(); notify(`Đã lưu bài học${files.length ? ` cùng ${files.length} ảnh` : ""}.`);
+          } catch (error) {
+            console.error("Không thể lưu bài học hoặc ảnh.", error);
+            for (const id of imageIds) { try { await deleteImage(id); } catch (cleanupError) { console.error("Không thể dọn ảnh tải lên chưa sử dụng.", cleanupError); } }
+            notify(`Không thể lưu bài viết: ${error.message}`, "error");
+            submit.disabled = false;
+            submit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Lưu bài học';
+          }
+        });
+        bindDialogClose();
+      }
+      async function readLesson(id) {
+        const lesson = state.lessons.find(item => item.id === id);
+        if (!lesson) return;
+        openDialog(`<article class="w-[min(94vw,820px)] p-6 sm:p-9"><div class="mb-6 flex items-start justify-between gap-4"><div><p class="mono text-[9px] uppercase tracking-[.18em] text-lilac">${esc(lesson.subject || "BÀI HỌC")}</p><h2 class="mt-2 text-2xl font-extrabold leading-tight sm:text-3xl">${esc(lesson.title)}</h2><p class="mt-2 text-[10px] text-muted">Cập nhật ${formatDate(lesson.updatedAt)}</p></div><button type="button" class="dialog-close btn-quiet shrink-0 !px-3 !py-2"><i class="fa-solid fa-xmark"></i></button></div><div class="lesson-content whitespace-pre-wrap break-words border-t border-line pt-5 text-sm leading-7 text-slate-300">${esc(lesson.content) || "Chưa có nội dung bài viết."}</div><div class="lesson-images mt-6 grid gap-3 sm:grid-cols-2"></div></article>`);
+        const gallery = $(".lesson-images");
+        for (const id of lesson.imageIds || []) {
+          try {
+            const record = await getImage(id);
+            if (!record) continue;
+            const image = document.createElement("img");
+            image.src = URL.createObjectURL(record.blob);
+            image.alt = record.name || "Ảnh minh họa bài học";
+            image.className = "max-h-[65vh] w-full cursor-zoom-in rounded-xl border border-line object-contain";
+            image.addEventListener("click", () => {
+              const viewer = window.open("", "_blank");
+              if (viewer) { viewer.document.write(`<title>${esc(record.name)}</title><style>body{margin:0;background:#090b0f;display:grid;place-items:center;min-height:100vh}img{max-width:100%;max-height:100vh;object-fit:contain}</style><img src="${image.src}" alt="${esc(record.name)}">`); viewer.document.close(); }
+              else notify("Trình duyệt đã chặn cửa sổ phóng to ảnh.", "error");
+            });
+            gallery.append(image);
+          } catch (error) { console.error("Không thể mở ảnh bài học.", error); }
+        }
+        bindDialogClose();
+      }
+      function bindDialogClose() {
+        $$(".dialog-close").forEach(button => button.addEventListener("click", closeDialog));
+      }
+      function addTodo(event) {
+        event.preventDefault();
+        const input = event.currentTarget.elements.text;
+        const text = input.value.trim();
+        if (!text) return;
+        state.todos.push({ id: newId(), text, date: today(), done: false, createdAt: new Date().toISOString() });
+        saveState(); event.currentTarget.reset(); render(); notify("Đã thêm việc cần làm.");
+      }
+      function addStickyNote() {
+        openDialog(`<form id="note-editor" class="w-[min(92vw,440px)] p-6"><div class="mb-5 flex items-center justify-between"><h2 class="text-xl font-extrabold">Ghi chú nhanh</h2><button type="button" class="dialog-close btn-quiet !px-3 !py-2"><i class="fa-solid fa-xmark"></i></button></div><label class="block text-[10px] text-muted">Nội dung<textarea name="text" class="input mt-1.5 min-h-36 resize-y leading-6" maxlength="1200" required placeholder="Viết điều bạn muốn ghi nhớ..."></textarea></label><div class="mt-4"><p class="mb-2 text-[10px] text-muted">Chọn màu ghi chú</p><div class="flex gap-3">${COLORS.map((color, i) => `<label class="cursor-pointer"><input class="sr-only" type="radio" name="color" value="${color}" ${i === 0 ? "checked" : ""}><span class="note-color block h-7 w-7 rounded-full border-2 ${i === 0 ? "border-white" : "border-transparent"}" style="background:${color}"></span></label>`).join("")}</div></div><button class="btn-primary mt-6 w-full" type="submit">Lưu ghi chú</button></form>`);
+        $$(".note-color").forEach(color => color.previousElementSibling.addEventListener("change", () => { $$(".note-color").forEach(el => el.classList.replace("border-white", "border-transparent")); color.classList.replace("border-transparent", "border-white"); }));
+        $("#note-editor").addEventListener("submit", event => { event.preventDefault(); const f = event.currentTarget; state.notes.push({ id: newId(), text: f.elements.text.value.trim(), color: f.elements.color.value, updatedAt: new Date().toISOString() }); saveState(); closeDialog(); render(); notify("Đã lưu ghi chú."); });
+        bindDialogClose();
+      }
+      function addTransaction(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = new FormData(form);
+        const amount = Number(data.get("amount"));
+        if (!Number.isFinite(amount) || amount <= 0) { notify("Số tiền phải lớn hơn 0.", "error"); return; }
+        state.transactions.push({ id: newId(), type: data.get("type"), amount, date: data.get("date"), category: data.get("category"), note: String(data.get("note") || "").trim() });
+        saveState(); form.reset(); render(); notify("Đã thêm giao dịch.");
+      }
+      function addHealth(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const weight = Number(form.elements.weight.value);
+        const height = Number(form.elements.height.value);
+        if (weight <= 0 || weight > 500 || height < 50 || height > 250) { notify("Vui lòng nhập cân nặng hoặc chiều cao hợp lệ.", "error"); return; }
+        const entry = { id: newId(), date: form.elements.date.value, weight, height };
+        const existing = state.health.findIndex(item => item.date === entry.date);
+        if (existing >= 0) state.health[existing] = { ...state.health[existing], ...entry };
+        else state.health.push(entry);
+        saveState(); render(); notify("Đã lưu chỉ số sức khỏe.");
+      }
+      async function exportData() {
+        try {
+          const images = await getAllImages();
+          const exportObject = { format: "myspace-dashboard", version: 1, exportedAt: new Date().toISOString(), state, images: await Promise.all(images.map(async image => ({ id: image.id, name: image.name, type: image.type, width: image.width, height: image.height, createdAt: image.createdAt, dataUrl: await blobToDataUrl(image.blob) }))) };
+          const blob = new Blob([JSON.stringify(exportObject, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url; anchor.download = `myspace-backup-${today()}.json`; anchor.click();
+          URL.revokeObjectURL(url);
+          notify(`Đã sao lưu dữ liệu và ${images.length} ảnh.`);
+        } catch (error) {
+          console.error("Không thể tạo bản sao lưu.", error);
+          notify(`Không thể sao lưu dữ liệu: ${error.message}`, "error");
+        }
+      }
+      function blobToDataUrl(blob) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error || new Error("Không thể đọc ảnh để sao lưu."));
+          reader.readAsDataURL(blob);
+        });
+      }
+      function dataUrlToBlob(dataUrl) {
+        if (typeof dataUrl !== "string" || !/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(dataUrl)) throw new Error("Bản sao lưu có ảnh không hợp lệ.");
+        const [header, encoded] = dataUrl.split(",");
+        const mime = header.match(/^data:(.*?);base64$/i)?.[1];
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+        return new Blob([bytes], { type: mime });
+      }
+      async function importData(file) {
+        try {
+          if (file.size > 200 * 1024 * 1024) throw new Error("Tệp sao lưu lớn hơn giới hạn 200 MB.");
+          const backup = JSON.parse(await file.text());
+          if (!backup || backup.format !== "myspace-dashboard" || !backup.state || typeof backup.state !== "object") throw new Error("Đây không phải tệp sao lưu MySpace hợp lệ.");
+          const imported = defaultState();
+          Object.keys(imported).forEach(key => { if (backup.state[key] !== undefined) imported[key] = backup.state[key]; });
+          const imageRecords = (Array.isArray(backup.images) ? backup.images : []).map(image => ({ id: String(image.id), name: String(image.name || "image"), type: "image/jpeg", width: Number(image.width) || 0, height: Number(image.height) || 0, createdAt: image.createdAt || new Date().toISOString(), blob: dataUrlToBlob(image.dataUrl) }));
+          const validIds = new Set(imageRecords.map(image => image.id));
+          const referenced = imported.lessons.flatMap(lesson => [...(lesson.imageIds || []), lesson.coverId].filter(Boolean));
+          if (referenced.some(id => !validIds.has(id))) throw new Error("Một hoặc nhiều hình ảnh trong bản sao lưu bị thiếu.");
+          await replaceImages(imageRecords);
+          state = imported;
+          saveState();
+          render();
+          const page = location.hash.slice(1);
+          showPage(PAGE_TITLES[page] ? page : "home");
+          notify(`Đã khôi phục dữ liệu và ${imageRecords.length} ảnh.`);
+        } catch (error) {
+          console.error("Không thể khôi phục bản sao lưu.", error);
+          notify(`Khôi phục thất bại: ${error.message}`, "error");
+        }
+      }
+      function bindEvents() {
+        $("#main-nav").addEventListener("click", event => { const button = event.target.closest("[data-page]"); if (button) showPage(button.dataset.page); });
+        document.addEventListener("click", event => {
+          const go = event.target.closest("[data-go]");
+          if (go) showPage(go.dataset.go);
+          const slot = event.target.closest(".schedule-slot");
+          if (slot) editSchedule(Number(slot.dataset.day), Number(slot.dataset.slot));
+          const lesson = event.target.closest(".lesson-open");
+          if (lesson) readLesson(lesson.dataset.id);
+        });
+        $("#mobile-menu").addEventListener("click", () => { $("#sidebar").classList.add("mobile-open"); $("#mobile-shade").classList.remove("hidden"); });
+        $("#mobile-shade").addEventListener("click", closeMobileMenu);
+        $("#add-exam").addEventListener("click", addExam);
+        $("#add-link").addEventListener("click", addQuickLink);
+        $("#quick-links").addEventListener("click", event => {
+          if (event.target.closest("#empty-add-link")) addQuickLink();
+          const button = event.target.closest(".delete-link");
+          if (button) { state.quickLinks = state.quickLinks.filter(item => item.id !== button.dataset.id); saveState(); render(); notify("Đã xóa liên kết."); }
+        });
+        $("#exam-list").addEventListener("click", event => { const button = event.target.closest(".delete-exam"); if (button) { state.exams = state.exams.filter(item => item.id !== button.dataset.id); saveState(); render(); notify("Đã xóa kỳ thi."); } });
+        $("#save-budget").addEventListener("click", () => {
+          const amount = Number($("#budget-input").value);
+          if (!Number.isFinite(amount) || amount < 0) { notify("Ngân sách phải là số không âm.", "error"); return; }
+          state.budget[today().slice(0, 7)] = amount;
+          saveState(); render(); notify("Đã lưu ngân sách tháng.");
+        });
+        $("#transaction-form").addEventListener("submit", addTransaction);
+        $("#transactions").addEventListener("click", event => { const button = event.target.closest(".delete-transaction"); if (button) { state.transactions = state.transactions.filter(item => item.id !== button.dataset.id); saveState(); render(); notify("Đã xóa giao dịch."); } });
+        $("#new-lesson").addEventListener("click", newLesson);
+        $("#lesson-search").addEventListener("input", renderLessons);
+        $("#lesson-filter").addEventListener("change", renderLessons);
+        $("#lesson-list").addEventListener("click", async event => {
+          const button = event.target.closest(".delete-lesson");
+          if (!button) return;
+          const lesson = state.lessons.find(item => item.id === button.dataset.id);
+          if (!lesson || !confirm(`Xóa bài học “${lesson.title}” và các ảnh đính kèm?`)) return;
+          state.lessons = state.lessons.filter(item => item.id !== lesson.id);
+          saveState();
+          for (const id of lesson.imageIds || []) { try { await deleteImage(id); } catch (error) { console.error("Không thể xóa ảnh bài học.", error); } }
+          render(); notify("Đã xóa bài học.");
+        });
+        $("#todo-form").addEventListener("submit", addTodo);
+        $("#todo-list").addEventListener("change", event => {
+          const checkbox = event.target.closest(".todo-check");
+          if (checkbox) { const todo = state.todos.find(item => item.id === checkbox.dataset.id); if (todo) { todo.done = checkbox.checked; saveState(); render(); } }
+        });
+        $("#todo-list").addEventListener("click", event => { const button = event.target.closest(".delete-todo"); if (button) { state.todos = state.todos.filter(item => item.id !== button.dataset.id); saveState(); render(); } });
+        $("#add-note").addEventListener("click", addStickyNote);
+        $("#sticky-list").addEventListener("click", event => { const button = event.target.closest(".delete-note"); if (button) { state.notes = state.notes.filter(item => item.id !== button.dataset.id); saveState(); render(); notify("Đã xóa ghi chú."); } });
+        $("#health-form").addEventListener("submit", addHealth);
+        $("#health-history").addEventListener("click", event => { const button = event.target.closest(".delete-health"); if (button) { state.health = state.health.filter(item => item.id !== button.dataset.id); saveState(); render(); notify("Đã xóa chỉ số."); } });
+        $("#water-cups").addEventListener("click", event => { const button = event.target.closest(".water-cup"); if (button) { state.water[today()] = Number(button.dataset.count); saveState(); render(); notify(`Đã ghi nhận ${button.dataset.count} cốc nước.`); } });
+        $("#export-btn").addEventListener("click", exportData);
+        $("#import-btn").addEventListener("click", () => $("#import-file").click());
+        $("#import-file").addEventListener("change", event => { const file = event.target.files[0]; if (file) importData(file); event.target.value = ""; });
+        $("#editor-dialog").addEventListener("click", event => { if (event.target === $("#editor-dialog")) closeDialog(); });
+        window.addEventListener("resize", () => { if ($("#page-health").classList.contains("active")) drawWeightChart(); });
+        window.addEventListener("hashchange", () => { const page = location.hash.slice(1); showPage(PAGE_TITLES[page] ? page : "home"); });
+      }
+      function tickClock() {
+        $("#clock").textContent = new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date());
+      }
+      async function initialize() {
+        state = loadState();
+        bindLockScreen();
+        bindEvents();
+        render();
+        tickClock();
+        window.setInterval(tickClock, 1000);
+        const page = location.hash.slice(1);
+        showPage(PAGE_TITLES[page] ? page : "home");
+        try { await openDatabase(); }
+        catch (error) {
+          console.error("Không thể khởi tạo IndexedDB.", error);
+          notify(`Không thể mở bộ nhớ ảnh: ${error.message}`, "error");
+        }
+      }
+      initialize();
+    })();
+  </script>
+</body>
+</html>
